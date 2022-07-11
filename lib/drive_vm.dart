@@ -9,10 +9,10 @@ import 'package:http/http.dart';
 
 class DriveViewModel extends ChangeNotifier {
   bool isReady = false;
-  bool isFirst = false;
+  bool get isFirst => _account != null;
   String email = "";
   late final GoogleSignIn? _googleSignIn;
-  late final GoogleSignInAccount? _account;
+  GoogleSignInAccount? _account;
   late final Map<String, String>? _authHeaders;
   late final GoogleAuthClient? _authenticateClient;
   late final go.DriveApi? _driveApi;
@@ -23,19 +23,15 @@ class DriveViewModel extends ChangeNotifier {
   /// make sure use SchedulerBinding
   ///
   ///
-  Future<void> initiate() async {
-    _googleSignIn = GoogleSignIn.standard(scopes: [go.DriveApi.driveScope]);
-    _account = await _googleSignIn?.signIn();
-    _authHeaders = await _account?.authHeaders;
-    _authenticateClient = GoogleAuthClient(_authHeaders!);
-
-    _driveApi = go.DriveApi(_authenticateClient!);
-  }
-
   Future<bool> signIn() async {
     // await _googleSignIn.signOut(); // -> log out
     if (!isFirst) {
-      initiate();
+      _googleSignIn ??= GoogleSignIn.standard(scopes: [go.DriveApi.driveScope]);
+      _account ??= await _googleSignIn?.signIn();
+      _authHeaders ??= await _account?.authHeaders;
+      _authenticateClient ??= GoogleAuthClient(_authHeaders!);
+
+      _driveApi = go.DriveApi(_authenticateClient!);
     }
     _googleSignIn?.signIn();
 
@@ -54,7 +50,7 @@ class DriveViewModel extends ChangeNotifier {
   Future<bool> signOut() async {
     await _googleSignIn?.signOut();
     isReady = false;
-    isFirst = true;
+    _account = null;
     email = '-';
     notifyListeners();
     return true;
