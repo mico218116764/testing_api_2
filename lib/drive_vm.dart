@@ -11,11 +11,11 @@ class DriveViewModel extends ChangeNotifier {
   bool isReady = false;
   bool get isFirst => _account != null;
   String email = "";
-  late final GoogleSignIn? _googleSignIn;
+  GoogleSignIn? _googleSignIn;
   GoogleSignInAccount? _account;
-  late final Map<String, String>? _authHeaders;
-  late final GoogleAuthClient? _authenticateClient;
-  late final go.DriveApi? _driveApi;
+  Map<String, String>? _authHeaders;
+  GoogleAuthClient? _authenticateClient;
+  go.DriveApi? _driveApi;
   go.FileList? fileList;
 
   /// tihs sign in method will only run once when the state is ready to launch
