@@ -1,8 +1,13 @@
 import 'dart:developer';
 import 'dart:io';
+import 'package:archive/archive_io.dart' as ar;
+import 'package:flutter/cupertino.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:googleapis/cloudshell/v1.dart';
 import 'package:googleapis/drive/v3.dart' as go;
 import 'package:path/path.dart' as p;
 import 'package:http/http.dart';
@@ -51,13 +56,16 @@ class DriveViewModel extends ChangeNotifier {
     await _googleSignIn?.signOut();
     isReady = false;
     _account = null;
+    fileList = null;
     email = '-';
     notifyListeners();
     return true;
   }
 
   Future<void> listGoogleDriveFiles() async {
-    fileList = await _driveApi?.files.list(spaces: 'drive');
+    fileList ??= await _driveApi?.files.list(spaces: 'drive');
+    WidgetsFlutterBinding.ensureInitialized();
+    await FlutterDownloader.initialize();
     notifyListeners();
   }
 
@@ -81,11 +89,30 @@ class DriveViewModel extends ChangeNotifier {
         ),
       );
       if (driveFile.id != null) {
-        log('Uploaded Drive ID: ${driveFile.id}');
+        // log('Uploaded Drive ID: ${driveFile.id}');
+        print('Uploaded Drive ID: ${driveFile.id}');
         return true;
       }
     }
     return false;
+  }
+
+  Future<void> downloadFromDrive(String fileId) async {
+    // AIzaSyB82HHpNw70oIhhPijaQatSQnquixRFju0
+    Directory tempDir = await getTemporaryDirectory();
+    String tempPath = tempDir.path;
+
+    final taskId = await FlutterDownloader.enqueue(
+      url:
+          'https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=AIzaSyB82HHpNw70oIhhPijaQatSQnquixRFju0',
+      // savedDir: '/storage/emulated/0/Download',
+      savedDir: tempPath,
+      showNotification:
+          true, // show download progress in status bar (for Android)
+      openFileFromNotification:
+          true, // click on notification to open downloaded file (for Android)
+    );
+    print(taskId);
   }
 
   Future<String?> _getFolderId() async {
