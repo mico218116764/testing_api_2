@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:googleapis/drive/v3.dart' as go;
 import 'package:testing_api_2/drive_vm.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +48,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       final DriveViewModel vm = context.read(); //<- extension
 
@@ -135,9 +135,30 @@ class _MyHomePageState extends State<MyHomePage> {
                           padding: EdgeInsets.all(8),
                           width: MediaQuery.of(context).size.width,
                           height: 64,
-                          child: Text(
-                            f.name ?? '-',
-                            textAlign: TextAlign.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  f.name ?? '-',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    context
+                                        .read<DriveViewModel>()
+                                        .downloadFromDrive(f.id as String);
+                                  },
+                                  child: Text('Download'),
+                                ),
+                              )
+                            ],
                           ),
                         ),
                       ),
@@ -146,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
               }
               return ElevatedButton(
                 onPressed: () {
-                  // context.read<DriveViewModel>().listGoogleDriveFiles();
+                  context.read<DriveViewModel>().listGoogleDriveFiles();
                   // Navigator.push();
                 },
                 child: Text('Print Files Name'),
