@@ -1,23 +1,31 @@
 import 'dart:developer';
-import 'dart:io';
+import 'dart:io' as io;
+
 import 'package:flutter/cupertino.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as go;
+import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
-import 'package:http/http.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:testing_api_2/services/network_service.dart';
 
 class DriveViewModel extends ChangeNotifier {
   bool isReady = false;
-  bool get isFirst => _account != null;
-  String email = "";
+  bool get fileNotNull => fileList != null && fileList!.files != null;
+  bool get userIsNull => _account == null;
+  String email = '';
   GoogleSignIn? _googleSignIn;
   GoogleSignInAccount? _account;
   Map<String, String>? _authHeaders;
   GoogleAuthClient? _authenticateClient;
   go.DriveApi? _driveApi;
   go.FileList? fileList;
+
+  String? get getKey {
+    String? token = _authHeaders?['Authorization'].toString();
+    print(token);
+    return token;
+  }
 
   /// tihs sign in method will only run once when the state is ready to launch
   ///
@@ -26,19 +34,28 @@ class DriveViewModel extends ChangeNotifier {
   ///
   Future<bool> signIn() async {
     // await _googleSignIn.signOut(); // -> log out
-    if (!isFirst) {
-      _googleSignIn ??= GoogleSignIn.standard(scopes: [go.DriveApi.driveScope]);
-      _account ??= await _googleSignIn?.signIn();
-      _authHeaders ??= await _account?.authHeaders;
-      _authenticateClient ??= GoogleAuthClient(_authHeaders!);
-
-      _driveApi = go.DriveApi(_authenticateClient!);
+    print('findme ${_account == null}');
+    if (!userIsNull) {
+      await signOut();
     }
-    _googleSignIn?.signIn();
+
+    if (userIsNull) {
+      _googleSignIn = GoogleSignIn.standard(scopes: [go.DriveApi.driveScope]);
+      _account = await _googleSignIn?.signIn();
+      _authHeaders = await _account?.authHeaders;
+      if (_authHeaders != null) {
+        _authenticateClient = GoogleAuthClient(_authHeaders!);
+        NetworkService.initialize(_authHeaders!);
+      }
+      if (_authenticateClient != null) {
+        _driveApi = go.DriveApi(_authenticateClient!);
+      }
+    }
 
     log("User account: $_account");
 
-    if (_account != null) {
+    if (!userIsNull) {
+      print('findme ${_account?.email}');
       isReady = true;
       email = _account!.email;
       notifyListeners();
@@ -59,13 +76,11 @@ class DriveViewModel extends ChangeNotifier {
   }
 
   Future<void> listGoogleDriveFiles() async {
-    fileList ??= await _driveApi?.files.list(spaces: 'drive');
-    WidgetsFlutterBinding.ensureInitialized();
-    await FlutterDownloader.initialize();
+    fileList = await _driveApi?.files.list();
     notifyListeners();
   }
 
-  Future<bool> upload(File file) async {
+  Future<bool> upload(io.File file) async {
     if (_driveApi != null) {
       go.File fileToUpload = go.File();
       String? folderId = await _getFolderId();
@@ -93,22 +108,78 @@ class DriveViewModel extends ChangeNotifier {
     return false;
   }
 
-  Future<void> downloadFromDrive(String fileId) async {
-    // AIzaSyB82HHpNw70oIhhPijaQatSQnquixRFju0
-    Directory tempDir = await getTemporaryDirectory();
-    String tempPath = tempDir.path;
+  Future<bool> downloadFromDrive(go.File file) async {
+    final String? tempPath = await _getDownloadPath();
+    final List<int> dataStore = [];
+    final StringBuffer sb = StringBuffer();
+    final bool downloadable =
+        !(file.mimeType?.contains('google-apps') ?? false);
+    final bool downloadableDocuments =
+        (file.mimeType?.contains('google-apps.document') ?? false);
 
-    final taskId = await FlutterDownloader.enqueue(
-      url:
-          'https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=AIzaSyB82HHpNw70oIhhPijaQatSQnquixRFju0',
-      // savedDir: '/storage/emulated/0/Download',
-      savedDir: tempPath,
-      showNotification:
-          true, // show download progress in status bar (for Android)
-      openFileFromNotification:
-          true, // click on notification to open downloaded file (for Android)
+    sb.write(tempPath);
+    sb.write('/');
+    sb.write(file.name);
+
+    go.Media? response;
+    print('file mime: ${file.mimeType}');
+
+    if (downloadable && file.id != null) {
+      response = await _driveApi?.files.get(
+        file.id!,
+        downloadOptions: go.DownloadOptions.fullMedia,
+      ) as go.Media?;
+    } else if (downloadableDocuments) {
+      print('exported to mime: application/pdf');
+      sb.write('.pdf');
+      response = await _driveApi?.files.export(
+        file.id!,
+        'application/pdf',
+        downloadOptions: go.DownloadOptions.fullMedia,
+      );
+    }
+    double downloadProgress;
+
+    response?.stream.listen(
+      (data) {
+        // print("DataReceived: ${data.length}");
+        dataStore.insertAll(dataStore.length, data);
+        if (response?.length != null) {
+          downloadProgress = dataStore.length / response!.length!;
+          // print(downloadProgress);
+          printer(downloadProgress);
+        }
+      },
+      onDone: () async {
+        io.File file = io.File(sb.toString());
+        await file.writeAsBytes(dataStore);
+        print('Downloaded at: ${sb.toString()}');
+      },
+      onError: (error) {
+        print("Error: $error");
+      },
     );
-    print(taskId);
+
+    return response != null;
+  }
+
+  Future<String?> _getDownloadPath() async {
+    io.Directory? directory;
+    try {
+      if (io.Platform.isIOS) {
+        directory = await getApplicationDocumentsDirectory();
+      } else {
+        directory = io.Directory('/storage/emulated/0/Download');
+        // Put file in global download folder, if for an unknown reason it didn't exist, we fallback
+        // ignore: avoid_slow_async_io
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      }
+    } catch (err) {
+      print("Cannot get download folder path");
+    }
+    return directory?.path;
   }
 
   Future<String?> _getFolderId() async {
@@ -146,14 +217,14 @@ class DriveViewModel extends ChangeNotifier {
   }
 }
 
-class GoogleAuthClient extends BaseClient {
+class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
-  final Client _client = Client();
+  final http.Client _client = http.Client();
 
   GoogleAuthClient(this._headers);
 
   @override
-  Future<StreamedResponse> send(BaseRequest request) {
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
     return _client.send(request..headers.addAll(_headers));
   }
 }

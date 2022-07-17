@@ -36,7 +36,6 @@ dependencies:
   cupertino_icons: ^1.0.2
   googleapis : any
   google_sign_in : any
-  googleapis_auth: any
   url_launcher : ^6.1.4
   file_picker: ^4.6.1
   flutter_secure_storage: ^5.0.2
@@ -44,6 +43,11 @@ dependencies:
   archive: ^3.3.0
   flutter_downloader: ^1.8.0+1
   path_provider: ^2.0.11
+  firebase_core: ^1.19.2
+  dio: any
+  http: any
+  path: any
+  
 
 dev_dependencies:
   flutter_test:
