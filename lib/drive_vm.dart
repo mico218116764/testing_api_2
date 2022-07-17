@@ -1,13 +1,9 @@
 import 'dart:developer';
 import 'dart:io';
-import 'package:archive/archive_io.dart' as ar;
 import 'package:flutter/cupertino.dart';
 import 'package:path_provider/path_provider.dart';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:googleapis/cloudshell/v1.dart';
 import 'package:googleapis/drive/v3.dart' as go;
 import 'package:path/path.dart' as p;
 import 'package:http/http.dart';
