@@ -1,12 +1,13 @@
 import 'dart:developer';
 import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as go;
-import 'package:path/path.dart' as p;
 import 'package:http/http.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class DriveViewModel extends ChangeNotifier {
   bool isReady = false;
@@ -30,11 +31,14 @@ class DriveViewModel extends ChangeNotifier {
       _googleSignIn ??= GoogleSignIn.standard(scopes: [go.DriveApi.driveScope]);
       _account ??= await _googleSignIn?.signIn();
       _authHeaders ??= await _account?.authHeaders;
-      _authenticateClient ??= GoogleAuthClient(_authHeaders!);
-
-      _driveApi = go.DriveApi(_authenticateClient!);
+      if (_authHeaders != null) {
+        _authenticateClient ??= GoogleAuthClient(_authHeaders!);
+      }
+      if (_authenticateClient != null) {
+        _driveApi = go.DriveApi(_authenticateClient!);
+      }
     }
-    _googleSignIn?.signIn();
+    _account ??= await _googleSignIn?.signIn();
 
     log("User account: $_account");
 
@@ -55,13 +59,23 @@ class DriveViewModel extends ChangeNotifier {
     fileList = null;
     email = '-';
     notifyListeners();
+
     return true;
   }
 
-  Future<void> listGoogleDriveFiles() async {
-    fileList ??= await _driveApi?.files.list(spaces: 'drive');
-    WidgetsFlutterBinding.ensureInitialized();
-    await FlutterDownloader.initialize();
+  Future<void> listGoogleDriveFiles([String? filter]) async {
+    String query = filter ?? "name contains '.pdf'";
+    if (filter != null) {
+      filter = "$filter and name contains '.pdf'";
+    }
+
+    fileList = await _driveApi?.files.list(
+      spaces: 'drive',
+      q: query,
+    );
+
+    print(fileList?.files?.length);
+
     notifyListeners();
   }
 
@@ -87,6 +101,8 @@ class DriveViewModel extends ChangeNotifier {
       if (driveFile.id != null) {
         // log('Uploaded Drive ID: ${driveFile.id}');
         print('Uploaded Drive ID: ${driveFile.id}');
+        await listGoogleDriveFiles();
+
         return true;
       }
     }

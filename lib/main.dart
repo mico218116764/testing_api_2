@@ -9,7 +9,10 @@ import 'package:testing_api_2/drive_vm.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FlutterDownloader.initialize();
+
   runApp(const MyApp());
 }
 
@@ -123,7 +126,7 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (context, vm, _) {
               List<go.File>? fileList = vm.fileList?.files;
 
-              if (fileList != null) {
+              if (fileList != null && fileList.isNotEmpty) {
                 return Column(
                   children: [
                     for (go.File f in fileList)
@@ -167,7 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
               }
               return ElevatedButton(
                 onPressed: () {
-                  context.read<DriveViewModel>().listGoogleDriveFiles();
+                  vm.listGoogleDriveFiles();
                   // Navigator.push();
                 },
                 child: Text('Print Files Name'),
