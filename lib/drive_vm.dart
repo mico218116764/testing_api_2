@@ -63,10 +63,10 @@ class DriveViewModel extends ChangeNotifier {
     return true;
   }
 
-  Future<void> listGoogleDriveFiles([String? filter]) async {
-    String query = filter ?? "name contains '.pdf'";
-    if (filter != null) {
-      filter = "$filter and name contains '.pdf'";
+  Future<void> listGoogleDriveFiles([String? search]) async {
+    String query = "name contains '.pdf'";
+    if (search != null) {
+      query = "fullText contains '$search' and name contains '.pdf'";
     }
 
     fileList = await _driveApi?.files.list(
